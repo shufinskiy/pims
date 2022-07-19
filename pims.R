@@ -18,76 +18,78 @@ min_shots <- 200
 players <- transform_shots[, .(.N), by=.(PLAYER_ID, TEAM_ID)][N >= min_shots*2, .(PLAYER_ID, TEAM_ID)]
 
 ### Переходим на расчёт каждого игрока в отдельности
-player <- players[1]
-
-### Получение строк в transform_pbp, когда игрок совершал бросок и объединение их с transform_shots
-row_player_shot <- transform_pbp[PLAYER1_ID == player$PLAYER_ID & PLAYER1_TEAM_ID == player$TEAM_ID & EVENTMSGTYPE %in% c(1, 2)]
-player_shot_data <- data.table::merge.data.table(row_player_shot, transform_shots, by.x = c("GAME_ID", "EVENTNUM"), by.y = c("GAME_ID", "GAME_EVENT_ID"))
-
-### Преобразование данных wide-to-long, где строка - это данные о событие (бросок player) для каждого из пяти игроков команды, в которой играет player
-team_on_court <- data.table::melt(player_shot_data[, .(GAME_ID, EVENTNUM, PERSON1TYPE, LOC_X, LOC_Y, PLAYER1, PLAYER2, PLAYER3, PLAYER4, PLAYER5, 
-                                                       PLAYER6, PLAYER7, PLAYER8, PLAYER9, PLAYER10)],
-                                  id.vars = c("GAME_ID", "EVENTNUM", "PERSON1TYPE", "LOC_X", "LOC_Y"),
-                                  measure.vars = c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5", "PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10"),
-                                  value.name = "PLAYER_ID")[
-                                    (PERSON1TYPE == 4 & variable %in% c("PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10")) 
-                                    | (PERSON1TYPE == 5 & variable %in% c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5"))                       
-                                  ][, c("variable", "PERSON1TYPE")  := NULL]
-
-### Фильтрация партнёров, не проходящих по условию минимального количества бросков в группе (N >= min_shots & N <= cnt_shots - min_shots)
-teammates <- team_on_court[, .(.N), by="PLAYER_ID"][N >= min_shots & N <= dim(player_shot_data)[1] - min_shots, PLAYER_ID]
-
-### Переходим на расчёт каждого партнёра в отдельности
-teammate <- teammates[1]
-
-### Создаём фильтрацию team_on_court с данными только двух игроков. 
-### Разделяем броски на две категории: on(когда player и teammate на площадке) и off(когда на площадке только player)
-player_teammate_shot <- team_on_court[PLAYER_ID %in% c(player$PLAYER_ID, teammate)]
-factor_table <- player_teammate_shot[, .(.N), by=c("GAME_ID", "EVENTNUM")][, ("ON_OFF") := data.table::fifelse(N == 2, "on", "off")]
-
-### Добавляем информацию ON_OFF в таблицу player_teammate_shot, удаляем  дубликаты строк
-player_teammate_factor <- unique(data.table::merge.data.table(player_teammate_shot, factor_table, by=c("GAME_ID", "EVENTNUM"))[
-  , "PLAYER_ID" := NULL])[, .(ON_OFF, LOC_X, LOC_Y)]
-
-### Количество бросков в меньшей из двух групп
-min_group <- player_teammate_factor[, .N, by="ON_OFF"][, min(N)]
-
-### Переменные для многократного пересчёта
-### n_repeat - количество пересчётов raw_pims
-n_repeat <- 100
-
-set.seed(0)
-
-### Вектор рандомных значений (для воспроизводимости)
-random_seed <- seq(1, n_repeat)
-raw_pims_median <- median(sapply(random_seed, function(seed){
-  set.seed(seed)
+pims_season <- lapply(seq(1, dim(players)[1]), function(n){
+  player <- players[n, ]
+  ### Получение строк в transform_pbp, когда игрок совершал бросок и объединение их с transform_shots
+  row_player_shot <- transform_pbp[PLAYER1_ID == player$PLAYER_ID & PLAYER1_TEAM_ID == player$TEAM_ID & EVENTMSGTYPE %in% c(1, 2)]
+  player_shot_data <- data.table::merge.data.table(row_player_shot, transform_shots, by.x = c("GAME_ID", "EVENTNUM"), by.y = c("GAME_ID", "GAME_EVENT_ID"))
   
-  ### Деление на группы, обрезка большей группы до размера наименьшей.
-  on_shots <- player_teammate_factor[ON_OFF == "on"][sample(.N, min_group)]
-  off_shots <- player_teammate_factor[ON_OFF == "off"][sample(.N, min_group)]
+  ### Преобразование данных wide-to-long, где строка - это данные о событие (бросок player) для каждого из пяти игроков команды, в которой играет player
+  team_on_court <- data.table::melt(player_shot_data[, .(GAME_ID, EVENTNUM, PERSON1TYPE, LOC_X, LOC_Y, PLAYER1, PLAYER2, PLAYER3, PLAYER4, PLAYER5, 
+                                                         PLAYER6, PLAYER7, PLAYER8, PLAYER9, PLAYER10)],
+                                    id.vars = c("GAME_ID", "EVENTNUM", "PERSON1TYPE", "LOC_X", "LOC_Y"),
+                                    measure.vars = c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5", "PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10"),
+                                    value.name = "PLAYER_ID")[
+                                      (PERSON1TYPE == 4 & variable %in% c("PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10")) 
+                                      | (PERSON1TYPE == 5 & variable %in% c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5"))                       
+                                    ][, c("variable", "PERSON1TYPE")  := NULL]
   
-  ### Разделение на четыре вектора по парам значений (координата, on_off)
-  off_x <- off_shots[, LOC_X]
-  on_x <- on_shots[, LOC_X]
-  off_y <- off_shots[, LOC_Y]
-  on_y <- on_shots[, LOC_Y]
-  
-  ### Средние координаты выборки по модулю
-  mean_x <- mean(abs(c(off_x, on_x)))
-  mean_y <- mean(c(off_y, on_y))
-  
-  ### Расчёт raw_pims (без учёта случайных колебаний на таком количестве бросков)
-  raw_pims <- sum(abs(sort(off_x) - sort(on_x))/sqrt(mean_x) + abs(sort(off_y) - sort(on_y))/sqrt(mean_y))/min_group
-  return(raw_pims)
-}))
+  ### Фильтрация партнёров, не проходящих по условию минимального количества бросков в группе (N >= min_shots & N <= cnt_shots - min_shots)
+  teammates <- team_on_court[, .(.N), by="PLAYER_ID"][N >= min_shots & N <= dim(player_shot_data)[1] - min_shots, PLAYER_ID]
+  ### Переходим на расчёт каждого партнёра в отдельности
+  teammates_pims <- sapply(teammates, function(teammate){
+    ### Создаём фильтрацию team_on_court с данными только двух игроков. 
+    ### Разделяем броски на две категории: on(когда player и teammate на площадке) и off(когда на площадке только player)
+    player_teammate_shot <- team_on_court[PLAYER_ID %in% c(player$PLAYER_ID, teammate)]
+    factor_table <- player_teammate_shot[, .(.N), by=c("GAME_ID", "EVENTNUM")][, ("ON_OFF") := data.table::fifelse(N == 2, "on", "off")]
+    
+    ### Добавляем информацию ON_OFF в таблицу player_teammate_shot, удаляем  дубликаты строк
+    player_teammate_factor <- unique(data.table::merge.data.table(player_teammate_shot, factor_table, by=c("GAME_ID", "EVENTNUM"))[
+      , "PLAYER_ID" := NULL])[, .(ON_OFF, LOC_X, LOC_Y)]
+    
+    ### Количество бросков в меньшей из двух групп
+    min_group <- player_teammate_factor[, .N, by="ON_OFF"][, min(N)]
+    
+    ### Переменные для многократного пересчёта
+    ### n_repeat - количество пересчётов raw_pims
+    n_repeat <- 100
+    
+    set.seed(0)
+    
+    ### Вектор рандомных значений (для воспроизводимости)
+    random_seed <- seq(1, n_repeat)
+    raw_pims_median <- median(sapply(random_seed, function(seed){
+      set.seed(seed)
+      
+      ### Деление на группы, обрезка большей группы до размера наименьшей.
+      on_shots <- player_teammate_factor[ON_OFF == "on"][sample(.N, min_group)]
+      off_shots <- player_teammate_factor[ON_OFF == "off"][sample(.N, min_group)]
+      
+      ### Разделение на четыре вектора по парам значений (координата, on_off)
+      off_x <- off_shots[, LOC_X]
+      on_x <- on_shots[, LOC_X]
+      off_y <- off_shots[, LOC_Y]
+      on_y <- on_shots[, LOC_Y]
+      
+      ### Средние координаты выборки по модулю
+      mean_x <- mean(abs(c(off_x, on_x)))
+      mean_y <- mean(c(off_y, on_y))
+      
+      ### Расчёт raw_pims (без учёта случайных колебаний на таком количестве бросков)
+      raw_pims <- sum(abs(sort(off_x) - sort(on_x))/sqrt(mean_x) + abs(sort(off_y) - sort(on_y))/sqrt(mean_y))/min_group
+      return(raw_pims)
+    }))
+    
+    ### Расчёт default_pims (без учёта какие партнёры находятся на площадке)
+    default_pims <- 1.135 - 0.00335*min_group + 0.000005234*min_group^2 - 0.000000002923*min_group^3
+    
+    ### Расчёт pims (во сколько раз больше/меньше raw_pims_median относительно default_pims)
+    pims <- if(raw_pims_median >= default_pims){
+      raw_pims_median/default_pims
+    } else {
+      -default_pims/raw_pims_median
+    }
+    return(pims)
+  })
+})
 
-### Расчёт default_pims (без учёта какие партнёры находятся на площадке)
-default_pims <- 1.135 - 0.00335*min_group + 0.000005234*min_group^2 - 0.000000002923*min_group^3
-
-### Расчёт pims (во сколько раз больше/меньше raw_pims_median относительно default_pims)
-pims <- if(raw_pims_median >= default_pims){
-  raw_pims_median/default_pims
-} else {
-  -default_pims/raw_pims_median
-}
