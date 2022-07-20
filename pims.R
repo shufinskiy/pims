@@ -5,7 +5,7 @@ pbp <- data.table::fread("./data/nbastats_2021.csv")
 shots <- data.table::fread("./data/shotdetail_2021.csv")
 player_info <- data.table::fread("./data/commonal_players.csv")
 
-calculate_pims <- function(pbp_data, shot_data, min_shots=200, n_repeat=100){
+calculate_pims <- function(pbp_data, shot_data, player_id = NA, partner_id = NA, min_shots=200, n_repeat=100){
   ### Обработка входных данных (удаление дубликатов, удаление ненужных полей и бросков с дальней дистанции, трансформация дистанции броска в футы от кольца)
   transform_pbp <- unique(pbp_data[, .(GAME_ID, EVENTNUM, EVENTMSGTYPE, PERSON1TYPE, PLAYER1_ID, PLAYER1_TEAM_ID, PLAYER1, PLAYER2, 
                                        PLAYER3, PLAYER4, PLAYER5, PLAYER6, PLAYER7, PLAYER8, PLAYER9, PLAYER10)])
@@ -15,6 +15,12 @@ calculate_pims <- function(pbp_data, shot_data, min_shots=200, n_repeat=100){
   
   ### Находим игроков, которые сделали в два раза больше минимально необходимого количества бросков для одной группы за одну команду в сезоне
   players <- transform_shots[, .(.N), by=.(PLAYER_ID, TEAM_ID)][N >= min_shots*2, .(PLAYER_ID, TEAM_ID)]
+  if(!is.na(player_id)){
+    players <- players[PLAYER_ID == player_id]
+    if(dim(players)[1] == 0){
+      return(NA)
+    }
+  }
   
   ### Переходим на расчёт каждого игрока в отдельности
   pims_season <- lapply(seq(1, dim(players)[1]), function(n){
@@ -36,6 +42,9 @@ calculate_pims <- function(pbp_data, shot_data, min_shots=200, n_repeat=100){
     
     ### Фильтрация партнёров, не проходящих по условию минимального количества бросков в группе (N >= min_shots & N <= cnt_shots - min_shots)
     teammates <- team_on_court[, .(.N), by="PLAYER_ID"][N >= min_shots & N <= dim(player_shot_data)[1] - min_shots, PLAYER_ID]
+    if(!is.na(partner_id)){
+      teammates <- teammates[teammates == partner_id]
+    }
     ### Если нет партнёров, удовлетворяющих условиям, возвращаем NA
     if(length(teammates) == 0){
       return(NA)
