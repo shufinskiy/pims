@@ -18,7 +18,25 @@ min_shots <- 200
 players <- transform_shots[, .(.N), by=.(PLAYER_ID, TEAM_ID)][N >= min_shots*2, .(PLAYER_ID, TEAM_ID)]
 
 ### Переходим на расчёт каждого игрока в отдельности
-player <- players[1]
+player <- players[3]
+
+### Список всех игр команды в сезоне с указаением хозяева/гости
+team_games <- unique(transform_pbp[PLAYER1_TEAM_ID == player$TEAM_ID, .(GAME_ID, PERSON1TYPE)])
+
+### Таблица всех игроков команды с GAME_ID, в которых эти партнёры выходили на площадку
+teammates <- unique(data.table::melt(data.table::merge.data.table(transform_pbp[GAME_ID %in% team_games$GAME_ID, 
+                                                                                .(GAME_ID, PLAYER1, PLAYER2, PLAYER3, PLAYER4, PLAYER5, 
+                                                                                  PLAYER6, PLAYER7, PLAYER8, PLAYER9, PLAYER10)],
+                                                           team_games, by="GAME_ID"),
+                              id.vars = c("GAME_ID", "PERSON1TYPE"),
+                              measure.vars = c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5", "PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10"),
+                              value.name = "PLAYER_ID")[
+                                (PERSON1TYPE == 4 & variable %in% c("PLAYER6", "PLAYER7", "PLAYER8", "PLAYER9", "PLAYER10")) 
+                                | (PERSON1TYPE == 5 & variable %in% c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5"))                       
+                              ][, c("variable", "PERSON1TYPE")  := NULL][PLAYER_ID != player$PLAYER_ID])
+
+### Вектор id всех игроков команды в сезоне
+teammates_id <- unique(teammates[, PLAYER_ID])
 
 ### Получение строк в transform_pbp, когда игрок совершал бросок и объединение их с transform_shots
 row_player_shot <- transform_pbp[PLAYER1_ID == player$PLAYER_ID & PLAYER1_TEAM_ID == player$TEAM_ID & EVENTMSGTYPE %in% c(1, 2)]
@@ -34,15 +52,19 @@ team_on_court <- data.table::melt(player_shot_data[, .(GAME_ID, EVENTNUM, PERSON
                         | (PERSON1TYPE == 5 & variable %in% c("PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4", "PLAYER5"))                       
                       ][, c("variable", "PERSON1TYPE")  := NULL]
 
-### Фильтрация партнёров, не проходящих по условию минимального количества бросков в группе (N >= min_shots & N <= cnt_shots - min_shots)
-teammates <- team_on_court[, .(.N), by="PLAYER_ID"][N >= min_shots & N <= dim(player_shot_data)[1] - min_shots, PLAYER_ID]
-
 ### Переходим на расчёт каждого партнёра в отдельности
-teammate <- teammates[1]
+teammate <- teammates_id[1]
+
+### Проверка партнёра, проходит ли он по условию минимального количества бросков в группе (N >= min_shots & N <= cnt_shots - min_shots)
+cnt_player_shots <- dim(player_shot_data[GAME_ID %in% teammates[PLAYER_ID == teammate, GAME_ID]])[1]
+cnt_shots_on <- dim(team_on_court[PLAYER_ID == teammate])[1]
+
+### Проверка должна возвращаеть TRUE
+(cnt_player_shots - cnt_shots_on >= min_shots & cnt_shots_on >= min_shots)
 
 ### Создаём фильтрацию team_on_court с данными только двух игроков. 
 ### Разделяем броски на две категории: on(когда player и teammate на площадке) и off(когда на площадке только player)
-player_teammate_shot <- team_on_court[PLAYER_ID %in% c(player$PLAYER_ID, teammate)]
+player_teammate_shot <- team_on_court[PLAYER_ID %in% c(player$PLAYER_ID, teammate) & GAME_ID %in% teammates[PLAYER_ID == teammate, GAME_ID]]
 factor_table <- player_teammate_shot[, .(.N), by=c("GAME_ID", "EVENTNUM")][, ("ON_OFF") := data.table::fifelse(N == 2, "on", "off")]
 
 ### Добавляем информацию ON_OFF в таблицу player_teammate_shot, удаляем  дубликаты строк
