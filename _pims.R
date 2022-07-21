@@ -6,9 +6,8 @@ shots <- data.table::fread("./data/shotdetail_2021.csv")
 player_info <- data.table::fread("./data/commonal_players.csv")
 
 ### Обработка входных данных (удаление дубликатов, удаление ненужных полей и бросков с дальней дистанции, трансформация дистанции броска в футы от кольца)
-transform_pbp <- unique(pbp[, .(GAME_ID, EVENTNUM, EVENTMSGTYPE, PERSON1TYPE, PLAYER1_ID, PLAYER1_TEAM_ID, PERSON2TYPE, PLAYER2_ID, PLAYER2_TEAM_ID,
-                         PERSON3TYPE, PLAYER3_ID, PLAYER3_TEAM_ID, PLAYER1, PLAYER2, PLAYER3, PLAYER4, PLAYER5, PLAYER6, PLAYER7,
-                         PLAYER8, PLAYER9, PLAYER10)])
+transform_pbp <- unique(pbp[, .(GAME_ID, EVENTNUM, EVENTMSGTYPE, PERSON1TYPE, PLAYER1_ID, PLAYER1_TEAM_ID, PLAYER1, PLAYER2, PLAYER3, 
+                                PLAYER4, PLAYER5, PLAYER6, PLAYER7, PLAYER8, PLAYER9, PLAYER10)])
 transform_shots <- shots[LOC_Y <= 297.5, .(GAME_ID, GAME_EVENT_ID, PLAYER_ID, TEAM_ID, LOC_X, LOC_Y)]
 transform_shots$LOC_X <- transform_shots$LOC_X / 10
 transform_shots$LOC_Y <- transform_shots$LOC_Y /10 + 5.25
