@@ -1,6 +1,3 @@
-#### Написание и тестирование функции pims
-library(data.table, warn.conflicts = FALSE)
-
 pbp <- data.table::fread("./data/nbastats_2021.csv")
 shots <- data.table::fread("./data/shotdetail_2021.csv")
 player_info <- data.table::fread("./data/commonal_players.csv")
