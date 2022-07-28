@@ -12,7 +12,7 @@ download_shotdetail_dropbox <- function(path = "./data/"){
                     "https://www.dropbox.com/s/f4dw48a9v8ynhe5/shotdetail_2019.tar.xz?dl=1",
                     "https://www.dropbox.com/s/9cos0l2rat1rela/shotdetail_2020.tar.xz?dl=1",
                     "https://www.dropbox.com/s/de81ie1lj0nvorc/shotdetail_2021.tar.xz?dl=1")
-  
+
   for(link in dropbox_link){
     season <- regmatches(link, regexpr("\\d{4}", link))
     if(!file.exists(paste0(path, season ,".csv"))){
@@ -116,7 +116,7 @@ pims_endpoint_chart <- function(endpoints, verbose=TRUE, save_endpoint=TRUE){
       print(paste0("Расчёт выполнен. Значение PIMS для ", endpoints[i]/2," равно: ", pims))
     }
     if(save_endpoint){
-      if(file.exists("./save_endpoit.txt")){
+      if(file.exists("./data/save_endpoit.txt")){
         write(paste0("N_SHOT: ", endpoints[i]/2, ", PIMS: ", pims), "./data/save_endpoit.txt", append = TRUE)
       } else {
         write(paste0("N_SHOT: ", endpoints[i]/2, ", PIMS: ", pims), "./data/save_endpoit.txt")
