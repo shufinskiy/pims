@@ -119,7 +119,7 @@ calculate_pims_meta <- function(pbp_data, shot_data, player_id = NA, partner_id 
       }))
       raw_pims_median <- apply(raw_pims_median, 2, median)
       ### Расчёт default_pims (без учёта какие партнёры находятся на площадке)
-      default_pims <- 1.135 - 0.00335*min_group + 0.000005234*min_group^2 - 0.000000002923*min_group^3
+      default_pims <- 1.144 - 0.003399*min_group + 0.000005337*min_group^2 - 0.000000002997*min_group^3
       
       ### Расчёт pims (во сколько раз больше/меньше raw_pims_median относительно default_pims)
       pims <- if(raw_pims_median[1] >= default_pims){

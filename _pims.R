@@ -92,7 +92,7 @@ mean_y <- mean(c(off_y, on_y))
 raw_pims <- sum(abs(sort(off_x) - sort(on_x))/sqrt(mean_x) + abs(sort(off_y) - sort(on_y))/sqrt(mean_y))/min_group
 
 ### Расчёт default_pims (без учёта какие партнёры находятся на площадке)
-default_pims <- 1.135 - 0.00335*min_group + 0.000005234*min_group^2 - 0.000000002923*min_group^3
+default_pims <- 1.144 - 0.003399*min_group + 0.000005337*min_group^2 - 0.000000002997*min_group^3
 
 ### Расчёт pims (во сколько раз больше/меньше raw_pims относительно default_pims)
 pims <- if(raw_pims >= default_pims){
