@@ -1,6 +1,14 @@
-pbp <- data.table::fread("./data/nbastats_2021.csv")
-shots <- data.table::fread("./data/shotdetail_2021.csv")
-player_info <- data.table::fread("./data/commonal_players.csv")
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(hoopR)
+
+pbp <- data.table::fread("./data/nbastats_2022_on_court.csv")
+shots <- data.table::fread("./data/shotdetail_2022.csv")
+player_info <- nba_commonallplayers(season = "2022-23", is_only_current_season = 0)
+player_info <- as.data.table(player_info$CommonAllPlayers)
+
+# shots <- shots[GAME_ID <= 22200528]
 
 calculate_pims_meta <- function(pbp_data, shot_data, player_id = NA, partner_id = NA, min_shots=200, n_repeat=100){
   ### Обработка входных данных (удаление дубликатов, удаление ненужных полей и бросков с дальней дистанции, трансформация дистанции броска в футы от кольца)
@@ -119,7 +127,7 @@ calculate_pims_meta <- function(pbp_data, shot_data, player_id = NA, partner_id 
       }))
       raw_pims_median <- apply(raw_pims_median, 2, median)
       ### Расчёт default_pims (без учёта какие партнёры находятся на площадке)
-      default_pims <- 1.135 - 0.00335*min_group + 0.000005234*min_group^2 - 0.000000002923*min_group^3
+      default_pims <- 1.144 - 0.003399*min_group + 0.000005337*min_group^2 - 0.000000002997*min_group^3
       
       ### Расчёт pims (во сколько раз больше/меньше raw_pims_median относительно default_pims)
       pims <- if(raw_pims_median[1] >= default_pims){
@@ -152,4 +160,20 @@ calculate_pims_meta <- function(pbp_data, shot_data, player_id = NA, partner_id 
   return(pims_season)
 }
 
-pims_meta <- calculate_pims_meta(pbp, shots, player_id = 2544)
+pims_meta <- calculate_pims_meta(pbp, shots, min_shots = 200)
+
+pims_meta$PLAYER_NAME <- unlist(lapply(pims_meta$PLAYER_ID, function(x){
+  player_name <- player_info[PERSON_ID == x, DISPLAY_FIRST_LAST]
+  if(length(player_name) == 0){
+    return("NA")
+  }
+  return(player_name)
+}))
+
+pims_meta$PARTNER_NAME <- unlist(lapply(pims_meta$PARTNER_ID, function(x){
+  player_name <- player_info[PERSON_ID == x, DISPLAY_FIRST_LAST]
+  if(length(player_name) == 0){
+    return("NA")
+  }
+  return(player_name)
+}))
