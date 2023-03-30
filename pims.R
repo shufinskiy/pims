@@ -1,6 +1,8 @@
-pbp <- data.table::fread("./data/nbastats_2021.csv")
-shots <- data.table::fread("./data/shotdetail_2021.csv")
-player_info <- data.table::fread("./data/commonal_players.csv")
+# pbp <- data.table::fread("./data/nbastats_2022_.csv")
+# shots <- data.table::fread("./data/shotdetail_2022.csv")
+# player_info <- data.table::fread("./data/commonal_players.csv")
+
+# shots <- shots[GAME_ID <= 22200528]
 
 calculate_pims <- function(pbp_data, shot_data, player_id = NA, partner_id = NA, min_shots=200, n_repeat=100){
   ### Обработка входных данных (удаление дубликатов, удаление ненужных полей и бросков с дальней дистанции, трансформация дистанции броска в футы от кольца)
