@@ -1,14 +1,7 @@
-library(data.table)
-library(dplyr)
-library(tidyr)
-library(hoopR)
-
 pbp <- data.table::fread("./data/nbastats_2022_on_court.csv")
 shots <- data.table::fread("./data/shotdetail_2022.csv")
-player_info <- nba_commonallplayers(season = "2022-23", is_only_current_season = 0)
-player_info <- as.data.table(player_info$CommonAllPlayers)
-
-# shots <- shots[GAME_ID <= 22200528]
+player_info <- hoopR::nba_commonallplayers(season = "2022-23", is_only_current_season = 0)
+player_info <- data.table::as.data.table(player_info$CommonAllPlayers)
 
 calculate_pims_meta <- function(pbp_data, shot_data, player_id = NA, partner_id = NA, min_shots=200, n_repeat=100){
   ### Обработка входных данных (удаление дубликатов, удаление ненужных полей и бросков с дальней дистанции, трансформация дистанции броска в футы от кольца)
